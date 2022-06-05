@@ -1,0 +1,16 @@
+[Unit]
+Description=Proxies service
+Requires=docker.service
+After=docker.service
+
+[Service]
+Restart=on-failure
+
+Environment=PROXIES_DOCKERCOMPOSEFILE=docker-compose.yaml
+
+WorkingDirectory=/home/ubuntu/proxies
+ExecStart=/usr/bin/docker compose -f ${PROXIES_DOCKERCOMPOSEFILE} up --remove-orphans
+ExecStop=/usr/bin/docker compose -f ${PROXIES_DOCKERCOMPOSEFILE} down
+
+[Install]
+WantedBy=multi-user.target

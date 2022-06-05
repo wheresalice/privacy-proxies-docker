@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+  reverse-proxy:
+    # The official v2 Traefik docker image
+    image: traefik:v2.7
+    # Enables the web UI and tells Traefik to listen to docker
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:-postmaster@localhost.localdomain}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+      - "443:443"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "./letsencrypt:/letsencrypt"
+  bibliogram:
+    container_name: bibliogram
+    image: quay.io/pussthecatorg/bibliogram:latest
+    ports:
+      - "127.0.0.1:10407:10407"
+    volumes:
+      - "./bibliogram/db/:/app/db/"
+      - "./bibliogram/config.js:/app/config.js"
+    restart: unless-stopped
+    labels:
+      - "traefik.http.routers.bibliogram.rule=Host(`${BIBLIOGRAM_HOSTNAME:-bibliogram.localhost.localdomain}`)"
+      - "traefik.http.routers.bibliogram.entrypoints=websecure"
+      - "traefik.http.routers.bibliogram.tls.certresolver=letsencrypt"
+      - "traefik.enable=true"
+  libreddit:
+    container_name: libreddit
+    image: spikecodes/libreddit
+    ports:
+      - "127.0.0.1:8081:8080"
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    labels:
+      - "traefik.http.routers.libreddit.rule=Host(`${LIBREDDIT_HOSTNAME:-libreddit.localhost.localdomain}`)"
+      - "traefik.http.routers.libreddit.entrypoints=websecure"
+      - "traefik.http.routers.libreddit.tls.certresolver=letsencrypt"
+      - "traefik.enable=true"
+  rimgo:
+    image: quay.io/pussthecatorg/rimgo
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    labels:
+      - "traefik.http.routers.rimgo.rule=Host(`${RIMGO_HOSTNAME:-rimgo.localhost.localdomain}`)"
+      - "traefik.http.routers.rimgo.entrypoints=websecure"
+      - "traefik.http.routers.rimgo.tls.certresolver=letsencrypt"
+      - "traefik.enable=true"
